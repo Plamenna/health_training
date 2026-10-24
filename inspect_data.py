@@ -16,10 +16,13 @@ def print_data_summary(path=DATA_DIR, sample_rows=5):
         print(f"No Parquet files found in {path}")
         return
 
-    # Files can have different columns, so merge every file's schema instead of
-    # trusting the first one, which would hide fields that only appear later
-    schema = pa.unify_schemas([pq.read_schema(f) for f in files] + [dataset.partitioning.schema])
-    table = ds.dataset(path, schema=schema, format="parquet", partitioning="hive").to_table()
+    # Files can have different columns, and nested ones (e.g. Health Auto Export's metrics
+    # vs workouts) that Arrow can't merge directly, so rebuild one table from all rows
+    rows = []
+    for f in files:
+        received_date = os.path.basename(os.path.dirname(f)).partition("=")[2]
+        rows += [{**row, "received_date": received_date} for row in pq.read_table(f).to_pylist()]
+    table = pa.Table.from_struct_array(pa.array(rows))
     print(f"Files: {len(files)}   Rows: {table.num_rows}   Columns: {table.num_columns}\n")
 
     print(f"{'variable':<20} {'type':<35} {'missing':>8}  examples")

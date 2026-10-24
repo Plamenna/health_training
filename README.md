@@ -45,8 +45,10 @@ Each accepted payload is saved as its own Parquet file under
 `$DATA_DIR/received_date=YYYY-MM-DD/` (`DATA_DIR` defaults to `data/`, and to `/app/data` in Docker,
 where Compose stores it in the `health_data` volume). The body can be one JSON object
 (one row) or a list of objects (one row each), and a `received_at` UTC timestamp column is
-added. Payloads that can't be turned into a table, such as `[1, 2]` or a field that is a
-number in one record and a string in another, get `400`.
+added. A body that isn't an object or a list of objects, such as `[1, 2]`, gets `400`.
+Valid JSON that Parquet can't hold, such as a field that is a number in one record and a
+string in another, is kept as-is in `$DATA_DIR/_raw/received_date=YYYY-MM-DD/*.json` so
+nothing is lost. Parquet readers skip `_` folders, so it doesn't affect the dataset.
 
 Read everything back as one dataset:
 
