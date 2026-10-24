@@ -7,7 +7,7 @@ the header, or with the wrong value, get `401 Unauthorized`.
 ## Run with Docker
 
 ```sh
-cp .env.example .env          # then put your own secret in .env
+echo "WEBHOOK_SECRET=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')" > .env
 docker compose up --build
 ```
 
