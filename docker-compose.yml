@@ -1,0 +1,13 @@
+services:
+  webhook:
+    build: .
+    ports:
+      - "5001:5000"
+    environment:
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:?Set WEBHOOK_SECRET in .env (see .env.example)}
+    volumes:
+      - health_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  health_data:

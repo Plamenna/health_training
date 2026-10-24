@@ -1,0 +1,10 @@
+.git
+.env
+__pycache__/
+*.pyc
+.venv/
+data/
+export.zip
+export*.zip
+apple_health_export/
+health_export_data/
