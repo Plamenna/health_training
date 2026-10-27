@@ -2,12 +2,34 @@ services:
   webhook:
     build: .
     ports:
-      - "5001:5000"
+      - "127.0.0.1:5001:5000"
     environment:
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:?Set WEBHOOK_SECRET in .env}
     volumes:
       - health_data:/app/data
     restart: unless-stopped
 
+  db:
+    # Pin the major version: minor updates (18.x) are safe, a jump to 19 needs a data migration
+    image: postgres:18
+    ports:
+      # Only this Mac can connect (e.g. psql or a GUI client); not exposed on the Wi-Fi
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      # Postgres 18 images keep data in /var/lib/postgresql/18/docker, so mount the parent
+      # directory (not /var/lib/postgresql/data as in images before 18)
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
 volumes:
   health_data:
+  postgres_data:

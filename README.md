@@ -68,6 +68,23 @@ docker compose exec webhook python inspect_data.py   # in Docker
 python inspect_data.py data                          # locally
 ```
 
+## Database (PostgreSQL 18)
+
+Compose also runs a `db` service (`postgres:18`). It needs three more lines in `.env`:
+
+```sh
+POSTGRES_USER=health
+POSTGRES_DB=health
+POSTGRES_PASSWORD=<a long random value>
+```
+
+Data lives in the `postgres_data` volume, mounted at `/var/lib/postgresql` (the path Postgres 18
+images expect). The port is bound to `127.0.0.1:5432`, so only this Mac can connect:
+
+```sh
+docker compose exec db psql -U health -d health    # SQL shell inside the container
+```
+
 ## Endpoints
 
 - `POST /webhook` — authenticated by `X-API-Key`, expects a JSON body.
