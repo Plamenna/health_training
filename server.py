@@ -1,14 +1,21 @@
 from datetime import datetime, timezone
-from flask import Flask, request, jsonify
+from typing import Any
 import hmac
 import json
 import os
 import uuid
 
+from fastapi import Body, Depends, FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.security import APIKeyHeader
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-app = Flask(__name__)
+app = FastAPI(
+    title="Health webhook",
+    description="Receives health data (e.g. from Health Auto Export) and stores it as Parquet.",
+)
 
 # Load the secret token from the environment so it never lives in source control
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET")
@@ -70,25 +77,51 @@ def save_raw_json(data, received_at):
     return write_atomically(partition_dir, new_filename(received_at, "json"), write)
 
 
-@app.route('/webhook', methods=['POST'])
-def receive_webhook():
-    # 1. Check for the secret token in the request headers
-    client_token = request.headers.get('X-API-Key', '')
+# Keep the {"status", "message"} error shape the phone apps already see, instead of
+# FastAPI's default {"detail": ...}
+@app.exception_handler(HTTPException)
+async def http_error(request: Request, exc: HTTPException):
+    return JSONResponse({"status": "error", "message": exc.detail}, status_code=exc.status_code)
 
+
+def is_authorized(client_token: str | None) -> bool:
     # compare_digest avoids leaking the secret through response timing
-    if not client_token or not hmac.compare_digest(client_token, WEBHOOK_SECRET):
-        # Reject unauthorized requests immediately
-        return jsonify({"status": "error", "message": "Unauthorized: Invalid or missing token"}), 401
+    return bool(client_token) and hmac.compare_digest(client_token, WEBHOOK_SECRET)
 
-    # 2. Extract and process the data if authorized
-    data = request.get_json(silent=True)
+
+UNAUTHORIZED = "Unauthorized: Invalid or missing token"
+
+
+# A body that isn't JSON would get FastAPI's 422; answer 400 like the Flask version did.
+# FastAPI parses the body before running dependencies, so check the key here too:
+# otherwise callers without a key could learn whether their JSON was valid.
+@app.exception_handler(RequestValidationError)
+async def validation_error(request: Request, exc: RequestValidationError):
+    if not is_authorized(request.headers.get("X-API-Key")):
+        return JSONResponse({"status": "error", "message": UNAUTHORIZED}, status_code=401)
+    return JSONResponse({"status": "error", "message": "No data provided"}, status_code=400)
+
+
+# Declaring the header as a security scheme adds an "Authorize" button to /docs.
+# auto_error=False so a missing key reaches require_api_key and gets our 401, not a 403.
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+
+def require_api_key(client_token: str | None = Depends(api_key_header)):
+    if not is_authorized(client_token):
+        raise HTTPException(status_code=401, detail=UNAUTHORIZED)
+
+
+# A plain `def` (not `async def`): writing Parquet blocks, so FastAPI runs it in a thread pool
+@app.post("/webhook", dependencies=[Depends(require_api_key)])
+def receive_webhook(data: dict[str, Any] | list[Any] = Body(...)):
     if not data:
-        return jsonify({"status": "error", "message": "No data provided"}), 400
+        raise HTTPException(status_code=400, detail="No data provided")
 
     print("--- Secure Health Data Received ---", flush=True)
     print(data, flush=True)
 
-    # 3. Persist the payload as Parquet
+    # Persist the payload as Parquet
     received_at = datetime.now(timezone.utc)
     try:
         path = save_to_parquet(data, received_at)
@@ -98,17 +131,25 @@ def receive_webhook():
         path = save_raw_json(data, received_at)
         print(f"Could not convert to Parquet ({e}); kept raw JSON instead", flush=True)
     except ValueError as e:
-        return jsonify({"status": "error", "message": f"Could not store data: {e}"}), 400
+        raise HTTPException(status_code=400, detail=f"Could not store data: {e}")
 
     print(f"Saved to {path}", flush=True)
 
-    return jsonify({"status": "success", "message": "Data received securely!"}), 200
+    return {"status": "success", "message": "Data received securely!"}
 
 
-@app.route('/health', methods=['GET'])
+@app.get("/health")
 def health():
-    return jsonify({"status": "ok"}), 200
+    return {"status": "ok"}
 
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=os.environ.get("FLASK_DEBUG") == "1")
+# Opening the bare address in a browser lands on the interactive docs instead of a 404
+@app.get("/", include_in_schema=False)
+def root():
+    return RedirectResponse("/docs")
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("server:app", host="0.0.0.0", port=5000, reload=os.environ.get("RELOAD") == "1")

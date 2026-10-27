@@ -21,4 +21,4 @@ VOLUME /app/data
 
 EXPOSE 5000
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--access-logfile", "-", "server:app"]
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "5000", "--workers", "2"]
