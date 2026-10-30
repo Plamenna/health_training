@@ -85,6 +85,26 @@ images expect). The port is bound to `127.0.0.1:5432`, so only this Mac can conn
 docker compose exec db psql -U health -d health    # SQL shell inside the container
 ```
 
+The schema is in [db/schema.sql](db/schema.sql). Postgres runs it automatically the first time the
+volume is created. It is safe to re-run, so apply changes to an existing database with:
+
+```sh
+docker compose exec -T db psql -U health -d health -v ON_ERROR_STOP=1 < db/schema.sql
+```
+
+| Object | One row per |
+|---|---|
+| `metric_sample` | metric × hour (or day); key `(metric, ts, source)` removes re-sent duplicates |
+| `metric_definition` | metric: frequency and whether a day is its sum or average |
+| `sleep_night` | night, filed under the morning you woke up |
+| `workout` | workout (the app's UUID); nested segments/splits/events kept as `jsonb` |
+| `workout_sample` | workout × series × minute |
+| `daily_metric` (view) | local day × metric |
+| `daily_summary` (view) | local day: steps, kcal, HRV, resting HR, last night's sleep, workouts |
+| `workout_overview` (view) | workout in minutes/kcal; `is_empty` flags 0-minute entries |
+
+Times are `timestamptz`; views group by day in `Europe/Zurich` via `local_day()`.
+
 ## Endpoints
 
 - `POST /webhook` — authenticated by `X-API-Key`, expects a JSON body.
