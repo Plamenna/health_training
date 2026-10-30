@@ -8,7 +8,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY server.py inspect_data.py ./
+COPY src/server.py src/inspect_data.py ./
 
 # Run as a non-root user
 RUN useradd --create-home appuser \

@@ -1,8 +1,8 @@
 """Explore an Apple Health export (Health app > profile > Export All Health Data).
 
 Usage:
-    python explore_health_export.py export.zip              # since Monday of this week
-    python explore_health_export.py export.zip --days 30    # the last 30 days
+    python src/explore_health_export.py export.zip              # since Monday of this week
+    python src/explore_health_export.py export.zip --days 30    # the last 30 days
 
 Prints what data types exist in the period and saves them as Parquet in --out.
 """

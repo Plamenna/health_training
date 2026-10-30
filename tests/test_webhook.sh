@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 # Sends three requests to verify the webhook's auth behaviour.
-# Usage: WEBHOOK_SECRET=... ./test_webhook.sh [url]
+# Usage: WEBHOOK_SECRET=... ./tests/test_webhook.sh [url]
 URL="${1:-http://localhost:5001/webhook}"
 SECRET="${WEBHOOK_SECRET:?Set WEBHOOK_SECRET to the value in .env}"
 

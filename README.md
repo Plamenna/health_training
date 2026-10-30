@@ -4,6 +4,16 @@ A small FastAPI webhook server that accepts health data over `POST /webhook`, bu
 from callers who send the shared secret in the `X-API-Key` header. Requests without
 the header, or with the wrong value, get `401 Unauthorized`.
 
+## Project layout
+
+```
+src/        server.py (webhook), inspect_data.py, explore_health_export.py
+tests/      test_webhook.sh
+db/         schema.sql for PostgreSQL
+docs/       architecture, decisions, current status, development log
+CLAUDE.md   notes for Claude Code
+```
+
 ## Run with Docker
 
 ```sh
@@ -27,7 +37,7 @@ docker run --rm -p 5000:5000 -e WEBHOOK_SECRET=<your-secret> health-webhook
 With the server running:
 
 ```sh
-WEBHOOK_SECRET=<your-secret> ./test_webhook.sh
+WEBHOOK_SECRET=<your-secret> ./tests/test_webhook.sh
 ```
 
 Expected:
@@ -65,7 +75,7 @@ To see which variables have arrived, their types, how often each is missing, and
 
 ```sh
 docker compose exec webhook python inspect_data.py   # in Docker
-python inspect_data.py data                          # locally
+python src/inspect_data.py data                      # locally
 ```
 
 ## Database (PostgreSQL 18)
@@ -115,7 +125,7 @@ Times are `timestamptz`; views group by day in `Europe/Zurich` via `local_day()`
 
 ```sh
 pip install -r requirements.txt
-WEBHOOK_SECRET=<your-secret> python server.py              # or: uvicorn server:app --reload --port 5000
+WEBHOOK_SECRET=<your-secret> python src/server.py   # or: uvicorn server:app --app-dir src --reload --port 5000
 ```
 
 ## Notes
